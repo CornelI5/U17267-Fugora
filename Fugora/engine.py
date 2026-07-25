@@ -18,7 +18,6 @@ class FugoraEngine:
         self.central_mass = SUN_MASS
         self._running = False
         
-        # New components
         self.events = EventManager()
         self.sources = SourceManager()
 
@@ -46,7 +45,13 @@ class FugoraEngine:
         self.sources.activate_all()
         self.events.emit("engine_initialized")
 
+    def ingest_external_data(self):
+        external_data = self.sources.get_all_data()
+        if external_data:
+            self.events.emit("data_ingested", external_data)
+
     def step(self):
+        self.ingest_external_data()
         self.integrator.step(self.objects)
         self.time_elapsed += self.dt
         self.step_count += 1
@@ -59,7 +64,6 @@ class FugoraEngine:
             self.anomalies.extend(new_anomalies)
             self.events.emit("anomaly_detected", new_anomalies)
 
-        # Emit data update event
         self.events.emit("step_completed", {
             "time": self.time_elapsed,
             "step": self.step_count
@@ -100,7 +104,7 @@ class FugoraEngine:
     def summary(self):
         state = self.get_state()
         lines = [
-            f"FUGORA Engine v0.7 Status",
+            f"FUGORA Engine v0.8 Status",
             f"  Time elapsed : {state['time_elapsed']:.2e} s",
             f"  Steps        : {state['step_count']}",
             f"  Objects      : {state['object_count']}",
