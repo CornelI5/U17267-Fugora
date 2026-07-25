@@ -28,3 +28,8 @@ made by CornelI5 from IDN
 ![Python](https://img.shields.io/badge/Python-3.8+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Status](https://img.shields.io/badge/Status-Active-orange)
+
+
+"CornelI5, you really want 1k stars right? but its so impossible."
+
+i dont need star, because god need it to give all the stars to me.
