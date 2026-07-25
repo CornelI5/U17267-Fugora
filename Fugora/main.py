@@ -9,29 +9,29 @@ def on_anomaly(data):
         print(f"[ALERT] Anomaly: {a.object_id} | Dev: {a.deviation:.4f}")
 
 
-def on_data_ingested(data):
-    if "NASA_NEO" in data:
-        neo_data = data["NASA_NEO"]
-        near_earth_objects = neo_data.get("near_earth_objects", {})
-        count = sum(len(v) for v in near_earth_objects.values())
-        print(f"[INFO] Ingested {count} NEOs from NASA")
-
-
 def main():
     with open('config.yaml', 'r') as f:
         config = yaml.safe_load(f)
 
     engine_cfg = config['engine']
+    perm_cfg = config['permissions']
     out_cfg = config['output']
 
-    engine = FugoraEngine(dt=engine_cfg['dt'])
+    allow_ext = perm_cfg['allow_external_updates']
+    
+    if allow_ext:
+        print("External data updates are ENABLED by config.")
+    else:
+        print("External data updates are DISABLED. Set 'allow_external_updates: true' in config.yaml to enable.")
+
+    engine = FugoraEngine(dt=engine_cfg['dt'], cpu_cores=4, allow_external=allow_ext)
     engine.set_central_mass(engine_cfg['central_mass'])
 
-    nasa_source = NasaNeoSource(api_key="DEMO_KEY")
-    engine.sources.add_source(nasa_source)
+    if allow_ext:
+        nasa_source = NasaNeoSource(api_key="DEMO_KEY")
+        engine.sources.add_source(nasa_source)
 
     engine.events.subscribe("anomaly_detected", on_anomaly)
-    engine.events.subscribe("data_ingested", on_data_ingested)
 
     objects_config = load_objects_from_config('config.yaml')
     for obj_conf in objects_config:
@@ -47,7 +47,7 @@ def main():
         engine.add_object(obj)
 
     print(engine.summary())
-    print("Starting simulation with live NASA data ingestion...")
+    print("Starting simulation...")
 
     max_steps = engine_cfg['max_steps']
     engine.run(total_steps=max_steps)
@@ -56,7 +56,11 @@ def main():
         save_state(engine, filename=out_cfg['filename'])
 
     print("\n" + engine.summary())
-    print("FUGORA v0.8 finished.")
+    print("FUGORA v1.0 finished.")
+
+
+if __name__ == "__main__":
+    main()d.")
 
 
 if __name__ == "__main__":
