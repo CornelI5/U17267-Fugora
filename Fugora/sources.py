@@ -1,71 +1,114 @@
 import time
-import requests
+from .constants import DEFAULT_DT, SUN_MASS
+from .integrator import VelocityVerlet
+from .gravity import compute_nbody_gravity, detect_anomalies
+from .objects import CelestialObject
+from .events import EventManager
+from .sources import SourceManager
 
 
-class DataSource:
-    def __init__(self, name):
-        self.name = name
-        self.active = False
-        self.last_update = 0
+class FugoraEngine:
+    def __init__(self, dt=DEFAULT_DT):
+        self.objects = []
+        self.dt = float(dt)
+        self.integrator = VelocityVerlet(self.dt)
+        self.time_elapsed = 0.0
+        self.step_count = 0
+        self.anomalies = []
+        self.central_mass = SUN_MASS
+        self._running = False
+        
+        self.events = EventManager()
+        self.sources = SourceManager()
 
-    def connect(self):
-        self.active = True
+    def add_object(self, obj):
+        if not isinstance(obj, CelestialObject):
+            raise TypeError("Expected CelestialObject instance")
+        self.objects.append(obj)
+        self.events.emit("object_added", obj.id)
 
-    def disconnect(self):
-        self.active = False
+    def remove_object(self, obj_id):
+        self.objects = [o for o in self.objects if o.id != obj_id]
+        self.events.emit("object_removed", obj_id)
 
-    def fetch_data(self):
-        raise NotImplementedError
+    def get_object(self, obj_id):
+        for obj in self.objects:
+            if obj.id == obj_id:
+                return obj
+        return None
 
+    def set_central_mass(self, mass):
+        self.central_mass = float(mass)
 
-class NasaNeoSource(DataSource):
-    def __init__(self, api_key="DEMO_KEY"):
-        super().__init__("NASA_NEO")
-        self.api_key = api_key
-        self.base_url = "https://api.nasa.gov/neo/rest/v1/feed"
+    def initialize(self):
+        compute_nbody_gravity(self.objects)
+        self.sources.activate_all()
+        self.events.emit("engine_initialized")
 
-    def fetch_data(self):
-        if not self.active:
-            return None
+    def ingest_external_data(self):
+        external_data = self.sources.get_all_data()
+        if external_data:
+            self.events.emit("data_ingested", external_data)
 
-        today = time.strftime("%Y-%m-%d", time.gmtime())
-        params = {
-            "start_date": today,
-            "end_date": today,
-            "api_key": self.api_key
+    def step(self):
+        self.ingest_external_data()
+        self.integrator.step(self.objects)
+        self.time_elapsed += self.dt
+        self.step_count += 1
+
+        new_anomalies = detect_anomalies(
+            self.objects, self.central_mass, self.time_elapsed
+        )
+        
+        if new_anomalies:
+            self.anomalies.extend(new_anomalies)
+            self.events.emit("anomaly_detected", new_anomalies)
+
+        self.events.emit("step_completed", {
+            "time": self.time_elapsed,
+            "step": self.step_count
+        })
+
+        return new_anomalies
+
+    def run(self, total_steps, callback=None):
+        self._running = True
+        self.initialize()
+
+        for i in range(total_steps):
+            if not self._running:
+                break
+
+            anomalies = self.step()
+
+            if callback:
+                callback(self, i, anomalies)
+
+        self.sources.deactivate_all()
+        self._running = False
+        self.events.emit("simulation_finished")
+
+    def stop(self):
+        self._running = False
+
+    def get_state(self):
+        return {
+            "time_elapsed": self.time_elapsed,
+            "step_count": self.step_count,
+            "object_count": len(self.objects),
+            "anomaly_count": len(self.anomalies),
+            "objects": [obj.copy_state() for obj in self.objects],
+            "sources_active": list(self.sources.sources.keys()),
         }
 
-        try:
-            response = requests.get(self.base_url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            self.last_update = time.time()
-            return data
-        except Exception as e:
-            print(f"Error fetching NASA data: {e}")
-            return None
-
-
-class SourceManager:
-    def __init__(self):
-        self.sources = {}
-
-    def add_source(self, source):
-        self.sources[source.name] = source
-
-    def get_all_data(self):
-        data = {}
-        for name, source in self.sources.items():
-            if source.active:
-                result = source.fetch_data()
-                if result:
-                    data[name] = result
-        return data
-
-    def activate_all(self):
-        for source in self.sources.values():
-            source.connect()
-
-    def deactivate_all(self):
-        for source in self.sources.values():
-            source.disconnect()
+    def summary(self):
+        state = self.get_state()
+        lines = [
+            f"FUGORA Engine v0.8 Status",
+            f"  Time elapsed : {state['time_elapsed']:.2e} s",
+            f"  Steps        : {state['step_count']}",
+            f"  Objects      : {state['object_count']}",
+            f"  Anomalies    : {state['anomaly_count']}",
+            f"  Sources      : {len(state['sources_active'])} active",
+        ]
+        return "\n".join(lines)
