@@ -1,4 +1,5 @@
 import time
+import requests
 
 
 class DataSource:
@@ -9,32 +10,40 @@ class DataSource:
 
     def connect(self):
         self.active = True
-        print(f"Connected to source: {self.name}")
 
     def disconnect(self):
         self.active = False
-        print(f"Disconnected from source: {self.name}")
 
     def fetch_data(self):
         raise NotImplementedError
 
 
-class DummySatelliteSource(DataSource):
-    def __init__(self):
-        super().__init__("DummySatellite")
+class NasaNeoSource(DataSource):
+    def __init__(self, api_key="DEMO_KEY"):
+        super().__init__("NASA_NEO")
+        self.api_key = api_key
+        self.base_url = "https://api.nasa.gov/neo/rest/v1/feed"
 
     def fetch_data(self):
         if not self.active:
             return None
-        
-        self.last_update = time.time()
-        # Simulasi data telemetry palsu
-        return {
-            "timestamp": self.last_update,
-            "object_id": "U17267",
-            "position_noise": [0.0, 0.0, 0.0], # Nanti bisa diisi noise beneran
-            "status": "OK"
+
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        params = {
+            "start_date": today,
+            "end_date": today,
+            "api_key": self.api_key
         }
+
+        try:
+            response = requests.get(self.base_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            self.last_update = time.time()
+            return data
+        except Exception as e:
+            print(f"Error fetching NASA data: {e}")
+            return None
 
 
 class SourceManager:
@@ -48,7 +57,9 @@ class SourceManager:
         data = {}
         for name, source in self.sources.items():
             if source.active:
-                data[name] = source.fetch_data()
+                result = source.fetch_data()
+                if result:
+                    data[name] = result
         return data
 
     def activate_all(self):
