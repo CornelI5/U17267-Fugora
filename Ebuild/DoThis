@@ -1,0 +1,1 @@
+sudo cp gentoo-pkg/u17267-fugora-1.0.0.ebuild /var/db/repos/local-overlay/dev-python/u17267-fugora/
