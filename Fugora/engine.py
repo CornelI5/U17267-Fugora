@@ -1,17 +1,18 @@
 import time
 import gc
+import os
 from .constants import DEFAULT_DT, SUN_MASS
 from .integrator import VelocityVerlet
 from .gravity import compute_nbody_gravity, detect_anomalies
 from .objects import CelestialObject
 from .events import EventManager
 from .sources import SourceManager
-from .vcpu import VirtualCPU
-from .scheduler import TaskScheduler, Task
+from .vcpu import VirtualCPU, Task
+from .scheduler import TaskScheduler
 
 
 class FugoraEngine:
-    def __init__(self, dt=DEFAULT_DT, cpu_cores=1, allow_external=False):
+    def __init__(self, dt=DEFAULT_DT, cpu_cores=None, allow_external=False):
         self.objects = []
         self.dt = float(dt)
         self.integrator = VelocityVerlet(self.dt)
@@ -20,12 +21,28 @@ class FugoraEngine:
         self.anomalies = []
         self.central_mass = SUN_MASS
         self._running = False
-        
+
         self.events = EventManager()
         self.sources = SourceManager(allow_external=allow_external)
-        
+
         self.vcpu = VirtualCPU(cores=cpu_cores)
         self.scheduler = TaskScheduler()
+
+        self.vcpu.register_task_type("gravity", self._task_gravity)
+        self.vcpu.register_task_type("anomaly_scan", self._task_anomaly_scan)
+        self.vcpu.register_task_type("ingest", self._task_ingest)
+
+        self.vcpu.platform.ensure_config_dir()
+
+    def _task_gravity(self):
+        compute_nbody_gravity(self.objects)
+        return len(self.objects)
+
+    def _task_anomaly_scan(self):
+        return detect_anomalies(self.objects, self.central_mass, self.time_elapsed)
+
+    def _task_ingest(self):
+        return self.sources.get_all_data()
 
     def add_object(self, obj):
         if not isinstance(obj, CelestialObject):
@@ -51,16 +68,24 @@ class FugoraEngine:
     def initialize(self):
         compute_nbody_gravity(self.objects)
         self.sources.activate_all()
-        self.events.emit("engine_initialized")
+        self.events.emit("engine_initialized", {
+            "platform": self.vcpu.platform.summary(),
+        })
 
     def ingest_external_data(self):
-        external_data = self.sources.get_all_data()
+        external_data = self.vcpu.execute_registered("ingest")
         if external_data:
             self.events.emit("data_ingested", external_data)
 
     def step(self):
-        task = Task(f"Step_{self.step_count}", priority=self.step_count, complexity=1000)
-        self.scheduler.add_task(task)
+        step_task = self.vcpu.create_task(
+            name=f"step_{self.step_count}",
+            priority=self.step_count,
+            complexity=1000,
+            is_critical=True,
+            tags=["simulation", "core"],
+        )
+        self.scheduler.add_task(step_task)
         self.scheduler.run_next(self.vcpu)
 
         self.ingest_external_data()
@@ -68,10 +93,8 @@ class FugoraEngine:
         self.time_elapsed += self.dt
         self.step_count += 1
 
-        new_anomalies = detect_anomalies(
-            self.objects, self.central_mass, self.time_elapsed
-        )
-        
+        new_anomalies = self.vcpu.execute_registered("anomaly_scan")
+
         if new_anomalies:
             self.anomalies.extend(new_anomalies)
             self.events.emit("anomaly_detected", new_anomalies)
@@ -79,7 +102,8 @@ class FugoraEngine:
         self.events.emit("step_completed", {
             "time": self.time_elapsed,
             "step": self.step_count,
-            "cpu_load": self.vcpu.current_load
+            "cpu_load": self.vcpu.current_load,
+            "throttled": self.vcpu.is_throttled(),
         })
 
         return new_anomalies
@@ -106,8 +130,8 @@ class FugoraEngine:
         self.events.clear()
         self.objects.clear()
         self.anomalies.clear()
-        self.scheduler.queue.clear()
-        self.scheduler.completed_tasks.clear()
+        self.scheduler.clear()
+        self.vcpu.clear_history()
         gc.collect()
         self._running = False
         self.events.emit("simulation_finished")
@@ -120,19 +144,48 @@ class FugoraEngine:
             "anomaly_count": len(self.anomalies),
             "objects": [obj.copy_state() for obj in self.objects],
             "sources_active": list(self.sources.sources.keys()),
-            "cpu_stats": self.vcpu.get_stats()
+            "cpu_stats": self.vcpu.get_stats(),
         }
+
+    def save_state_to_file(self, filename=None):
+        if filename is None:
+            config_dir = self.vcpu.platform.config_dir
+            filename = os.path.join(config_dir, "state.json")
+
+        import json
+        state = self.get_state()
+
+        serializable = {
+            "time_elapsed": state["time_elapsed"],
+            "step_count": state["step_count"],
+            "object_count": state["object_count"],
+            "anomaly_count": state["anomaly_count"],
+            "sources_active": state["sources_active"],
+            "cpu_stats": state["cpu_stats"],
+        }
+
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        with open(filename, "w") as f:
+            json.dump(serializable, f, indent=2)
+
+        return filename
 
     def summary(self):
         state = self.get_state()
-        cpu = state['cpu_stats']
+        cpu = state["cpu_stats"]
+        plat = cpu["platform"]
+
         lines = [
-            f"FUGORA Engine v1.0 Status",
+            "FUGORA Engine v1.0",
+            f"  Platform     : {plat['distro']} ({plat['system']})",
+            f"  Arch         : {plat['machine']}",
             f"  Time elapsed : {state['time_elapsed']:.2e} s",
             f"  Steps        : {state['step_count']}",
             f"  Objects      : {state['object_count']}",
-            f"  Anomalies    : {state['anomaly_count']} (Unbounded)",
+            f"  Anomalies    : {state['anomaly_count']}",
             f"  CPU Load     : {cpu['load_percent']}%",
-            f"  Memory Used  : {cpu['memory_used_mb']} MB",
+            f"  Memory Used  : {cpu['memory_used_mb']} / {cpu['memory_limit_mb']} MB",
+            f"  Throttled    : {'Yes' if cpu['throttled'] else 'No'}",
+            f"  Config Dir   : {plat['config_dir']}",
         ]
         return "\n".join(lines)
