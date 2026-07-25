@@ -32,5 +32,6 @@ made by CornelI5 from IDN
 
 "CornelI5, you really want 1k stars right? but its so impossible."
 
+.....
 
 i dont need star, because god need it to give all the stars to me.
