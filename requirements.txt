@@ -1,4 +1,4 @@
 numpy>=1.24
-matplotlib>=3.7
 pyyaml>=6.0
 requests>=2.31
+pygame>=2.5
