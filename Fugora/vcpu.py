@@ -1,47 +1,67 @@
 import time
+import os
+import platform
+import sys
+import threading
 
 
-class VirtualCPU:
-    def __init__(self, cores=1, clock_speed_ghz=3.0):
-        self.cores = cores
-        self.clock_speed = clock_speed_ghz * 1e9
-        self.current_load = 0.0
-        self.memory_used = 0
-        self.instructions_executed = 0
-        self.start_time = time.time()
-        self.throttle_threshold = 80.0
+class PlatformInfo:
+    def __init__(self):
+        self.system = platform.system()
+        self.machine = platform.machine()
+        self.processor = platform.processor()
+        self.python_version = platform.python_version()
+        self.distro_name = self._detect_distro()
+        self.distro_id = self._detect_distro_id()
+        self.is_windows = self.system == "Windows"
+        self.is_linux = self.system == "Linux"
+        self.is_macos = self.system == "Darwin"
+        self.is_64bit = platform.architecture()[0] == "64bit"
+        self.cpu_count = os.cpu_count() or 1
+        self.home_dir = os.path.expanduser("~")
+        self.config_dir = self._get_config_dir()
 
-    def execute_task(self, complexity, is_critical=False):
-        start = time.time()
-        
-        if not is_critical and self.current_load > self.throttle_threshold:
-            return 0.0
+    def _detect_distro(self):
+        if not self.is_linux:
+            return self.system
 
-        simulated_work = 0
-        for _ in range(int(complexity)):
-            simulated_work += 1
-        
-        elapsed = time.time() - start
-        self.instructions_executed += int(complexity)
-        
-        load = min(100.0, (elapsed / (1.0 / self.clock_speed)) * 100)
-        self.current_load = load
-        
-        return elapsed
+        try:
+            with open("/etc/os-release", "r") as f:
+                for line in f:
+                    if line.startswith("PRETTY_NAME="):
+                        return line.split("=", 1)[1].strip().strip('"')
+        except FileNotFoundError:
+            pass
 
-    def allocate_memory(self, size_bytes):
-        self.memory_used += size_bytes
+        try:
+            with open("/etc/lsb-release", "r") as f:
+                for line in f:
+                    if line.startswith("DISTRIB_DESCRIPTION="):
+                        return line.split("=", 1)[1].strip().strip('"')
+        except FileNotFoundError:
+            pass
 
-    def free_memory(self, size_bytes):
-        self.memory_used = max(0, self.memory_used - size_bytes)
+        return "Unknown Linux"
 
-    def get_stats(self):
-        uptime = time.time() - self.start_time
-        return {
-            "cores": self.cores,
-            "clock_speed_ghz": self.clock_speed / 1e9,
-            "load_percent": round(self.current_load, 2),
-            "memory_used_mb": round(self.memory_used / (1024**2), 2),
-            "instructions": self.instructions_executed,
-            "uptime_s": round(uptime, 2)
-        }
+    def _detect_distro_id(self):
+        if not self.is_linux:
+            return self.system.lower()
+
+        try:
+            with open("/etc/os-release", "r") as f:
+                for line in f:
+                    if line.startswith("ID="):
+                        return line.split("=", 1)[1].strip().strip('"')
+        except FileNotFoundError:
+            pass
+
+        return "unknown"
+
+    def _get_config_dir(self):
+        if self.is_windows:
+            base = os.environ.get("APPDATA", self.home_dir)
+            return os.path.join(base, "fugora")
+        elif self.is_macos:
+            return os.path.join(self.home_dir, "Library", "Application Support", "fugora")
+        else:
+            xdg = os.environ.get("XDG_CONFIG_HOME", os.path.join(self.home_dir, ".config
