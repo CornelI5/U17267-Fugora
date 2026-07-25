@@ -2,7 +2,7 @@ import yaml
 from fugora import FugoraEngine, CelestialObject, Vec3
 from fugora.io import load_objects_from_config
 from fugora.sources import NasaNeoSource
-from fugora.gui_viz import start_gui_viz
+from fugora.gl_viz import start_gl_viz
 
 
 def main():
@@ -35,11 +35,11 @@ def main():
         )
         engine.add_object(obj)
 
-    w = viz_cfg.get('width', 1200)
+    w = viz_cfg.get('width', 1280)
     h = viz_cfg.get('height', 800)
 
-    print("Starting FUGORA GUI 3D...")
-    start_gui_viz(engine, width=w, height=h)
+    print("Starting FUGORA OpenGL 3D...")
+    start_gl_viz(engine, width=w, height=h)
 
 
 if __name__ == "__main__":
