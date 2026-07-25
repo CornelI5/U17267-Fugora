@@ -1,59 +1,59 @@
-from fugora import FugoraEngine, CelestialObject, Vec3, OrbitVisualizer, AU, SUN_MASS, EARTH_MASS, JUPITER_MASS, MARS_MASS
+import yaml
+from fugora import FugoraEngine, CelestialObject, Vec3, OrbitVisualizer
+from fugora.io import load_objects_from_config, save_state
+from fugora.sources import DummySatelliteSource
 
 
-def on_step(engine, step, anomalies):
-    if anomalies:
-        for a in anomalies:
-            print(f"[ANOMALY] {a.object_id} | deviation: {a.deviation:.4f} | t={a.timestamp:.0f}s")
+def on_anomaly(data):
+    for a in data:
+        print(f"[ALERT] Anomaly detected: {a.object_id} | Dev: {a.deviation:.4f}")
 
 
 def main():
-    engine = FugoraEngine(dt=3600)
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
 
-    sun = CelestialObject(
-        obj_id="SUN", name="Sun", mass=SUN_MASS,
-        position=Vec3(0, 0, 0), velocity=Vec3(0, 0, 0),
-        radius=6.96e8, color="yellow",
-    )
+    engine_cfg = config['engine']
+    viz_cfg = config['visualization']
+    out_cfg = config['output']
 
-    earth = CelestialObject(
-        obj_id="EARTH", name="Earth", mass=EARTH_MASS,
-        position=Vec3(AU, 0, 0), velocity=Vec3(0, 29780, 0),
-        radius=6.371e6, color="dodgerblue",
-    )
+    engine = FugoraEngine(dt=engine_cfg['dt'])
+    engine.set_central_mass(engine_cfg['central_mass'])
 
-    mars = CelestialObject(
-        obj_id="MARS", name="Mars", mass=MARS_MASS,
-        position=Vec3(1.524 * AU, 0, 0), velocity=Vec3(0, 24070, 0),
-        radius=3.39e6, color="tomato",
-    )
+    sat_source = DummySatelliteSource()
+    engine.sources.add_source(sat_source)
 
-    jupiter = CelestialObject(
-        obj_id="JUPITER", name="Jupiter", mass=JUPITER_MASS,
-        position=Vec3(5.203 * AU, 0, 0), velocity=Vec3(0, 13070, 0),
-        radius=6.99e7, color="orange",
-    )
+    engine.events.subscribe("anomaly_detected", on_anomaly)
 
-    asteroid = CelestialObject(
-        obj_id="U17267", name="Fugora Target", mass=1.0e12,
-        position=Vec3(2.5 * AU, 0.3 * AU, 0),
-        velocity=Vec3(-3000, 18000, 500),
-        radius=5000, color="cyan",
-    )
-
-    engine.add_object(sun)
-    engine.add_object(earth)
-    engine.add_object(mars)
-    engine.add_object(jupiter)
-    engine.add_object(asteroid)
+    objects_config = load_objects_from_config('config.yaml')
+    for obj_conf in objects_config:
+        obj = CelestialObject(
+            obj_id=obj_conf['id'],
+            name=obj_conf['name'],
+            mass=obj_conf['mass'],
+            position=Vec3(*obj_conf['position']),
+            velocity=Vec3(*obj_conf['velocity']),
+            radius=obj_conf.get('radius', 0),
+            color=obj_conf.get('color', 'white'),
+        )
+        engine.add_object(obj)
 
     print(engine.summary())
-    print("\nStarting visualization...")
 
-    viz = OrbitVisualizer(engine, interval_ms=30)
-    viz.show(total_frames=5000)
+    max_steps = engine_cfg['max_steps']
+    
+    if viz_cfg['enabled']:
+        from fugora.visualization import OrbitVisualizer
+        viz = OrbitVisualizer(engine, interval_ms=viz_cfg['interval_ms'])
+        viz.show(total_frames=max_steps)
+    else:
+        engine.run(total_steps=max_steps)
+
+    if out_cfg['save_state']:
+        save_state(engine, filename=out_cfg['filename'])
 
     print("\n" + engine.summary())
+    print("FUGORA v0.7 finished.")
 
 
 if __name__ == "__main__":
