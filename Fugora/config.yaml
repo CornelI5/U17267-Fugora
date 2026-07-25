@@ -1,7 +1,11 @@
 engine:
-  dt: 3600             
-  max_steps: 10000 
+  dt: 3600
+  max_steps: 10000
   central_mass: 1.989e30
+
+permissions:
+  allow_external_updates: false
+  allow_data_persistence: true
 
 simulation:
   objects:
@@ -21,18 +25,9 @@ simulation:
       radius: 6.371e6
       color: dodgerblue
 
-    - id: U17267
-      name: Fugora Target
-      mass: 1.0e12
-      position: [2.5e11, 3.0e10, 0]
-      velocity: [-3000, 18000, 500]
-      radius: 5000
-      color: cyan
-
 visualization:
   enabled: true
   interval_ms: 30
-  trail_length: 2000
 
 output:
   save_state: true
