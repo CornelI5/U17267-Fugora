@@ -1,0 +1,22 @@
+# Maintainer: CornelI5 https://github.com/CornelI5
+pkgname=fugora
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Framework for Universal Gravitational Observation & Research Analysis"
+arch=('any')
+url="https://github.com/CornelI5/U17267-Fugora"
+license=('MIT')
+depends=('python' 'python-numpy' 'python-pyyaml' 'python-requests' 'python-pygame')
+makedepends=('python-setuptools')
+source=("U17267-Fugora-$pkgver.tar.gz::https://github.com/CornelI5/U17267-Fugora/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "U17267-Fugora-$pkgver"
+  python setup.py build
+}
+
+package() {
+  cd "U17267-Fugora-$pkgver"
+  python setup.py install --root="$pkgdir/" --optimize=1 --skip-build
+}
