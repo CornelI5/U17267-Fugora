@@ -311,7 +311,13 @@ class GLRenderer3D:
             glColor4f(color[0] * alpha, color[1] * alpha, color[2] * alpha, alpha)
             half = size / 2
             glBegin(GL_QUADS)
+            glBegin(GL_QUADS)
             glTexCoord2f(0, 0); glVertex2f(sx - half, sy - half)
             glTexCoord2f(1, 0); glVertex2f(sx + half, sy - half)
             glTexCoord2f(1, 1); glVertex2f(sx + half, sy + half)
-            glTexCoord2f(0
+            glTexCoord2f(0, 1); glVertex2f(sx - half, sy + half)
+            glEnd()
+        
+        glDisable(GL_TEXTURE_2D)
+        glDisable(GL_BLEND)
+        self.restore_3d()
