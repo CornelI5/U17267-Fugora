@@ -7,6 +7,10 @@ Framework for Universal Gravitational Observation & Research Analysis
 
 FUGORA is a high-performance Python framework designed for real-time gravitational simulation, orbital mechanics analysis, and celestial object tracking. It features an event-driven architecture, a virtual CPU governor for performance optimization, and seamless integration with external astronomical data sources.
 
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Status](https://img.shields.io/badge/Status-Active-orange)
+
 Features
 - N-Body Gravity Simulation: Uses Velocity Verlet integrator for energy-conserving orbital calculations.
 - Real-Time Anomaly Detection: Automatically flags objects with unpredictable orbital deviations.
