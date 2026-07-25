@@ -21,7 +21,8 @@ def main():
     if allow_ext:
         nasa_source = NasaNeoSource(api_key="DEMO_KEY")
         engine.sources.add_source(nasa_source)
-
+        nasa_source.parse_to_objects(engine)
+        
     objects_config = load_objects_from_config('config.yaml')
     for obj_conf in objects_config:
         obj = CelestialObject(
