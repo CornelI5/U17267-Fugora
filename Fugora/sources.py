@@ -47,13 +47,17 @@ class NasaNeoSource(DataSource):
 
 
 class SourceManager:
-    def __init__(self):
+    def __init__(self, allow_external=False):
         self.sources = {}
+        self.allow_external = allow_external
 
     def add_source(self, source):
         self.sources[source.name] = source
 
     def get_all_data(self):
+        if not self.allow_external:
+            return {}
+            
         data = {}
         for name, source in self.sources.items():
             if source.active:
