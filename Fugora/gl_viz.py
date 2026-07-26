@@ -322,6 +322,10 @@ class GLRenderer3D:
         self.restore_3d()
 
 def start_gl_viz(engine, width=1280, height=800):
+    pygame.init()
+    pygame.display.set_mode((width, height), pygame.OPENGL | pygame.DOUBLEBUF)
+    pygame.display.set_caption("FUGORA - Universal Gravitational Observation")
+
     renderer = GLRenderer3D(engine, width=width, height=height)
     renderer.init_gl()
     
@@ -332,12 +336,21 @@ def start_gl_viz(engine, width=1280, height=800):
     pygame.font.init()
     renderer.font = pygame.font.SysFont("Consolas", 15)
     
+    clock = pygame.time.Clock()
+    
     while renderer.running:
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                renderer.running = False
+        dt = clock.tick(60) / 1000.0 
         
-        engine.step()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                renderer.running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    renderer.running = False
+        
+        engine.step(dt)
+        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
         renderer.setup_3d()
         center = engine.objects[0] if engine.objects else None
