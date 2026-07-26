@@ -348,7 +348,7 @@ def start_gl_viz(engine, width=1280, height=800):
                 if event.key == pygame.K_ESCAPE:
                     renderer.running = False
         
-        engine.step(dt)
+        engine.step()
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
