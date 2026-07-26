@@ -1,7 +1,7 @@
 import time
 import gc
 import os
-from .constant import DEFAULT_DT, SUN_MASS
+from .constants import DEFAULT_DT, SUN_MASS
 from .integrator import VelocityVerlet
 from .gravity import compute_nbody_gravity, detect_anomalies
 from .objects import CelestialObject
