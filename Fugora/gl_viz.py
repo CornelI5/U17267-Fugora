@@ -321,3 +321,35 @@ class GLRenderer3D:
         glDisable(GL_TEXTURE_2D)
         glDisable(GL_BLEND)
         self.restore_3d()
+
+def start_gl_viz(engine):
+    renderer = GLRenderer3D(engine)
+    renderer.init_gl()
+    
+    renderer.star_positions = renderer.build_stars()
+    renderer.belt_positions = renderer.build_belt()
+    renderer.glow_tex = renderer.make_glow_texture()
+    
+    pygame.font.init()
+    renderer.font = pygame.font.SysFont("Consolas", 15)
+    
+    while renderer.running:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                renderer.running = False
+        
+        engine.step()
+        
+        renderer.setup_3d()
+        center = engine.objects[0] if engine.objects else None
+        if center:
+            renderer.draw_starfield()
+            renderer.draw_belt()
+            renderer.draw_reference_rings()
+            renderer.draw_trails(center)
+            renderer.draw_objects(center)
+            renderer.draw_screen_glow(center)
+        
+        pygame.display.flip()
+    
+    pygame.quit()
