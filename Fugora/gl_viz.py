@@ -322,8 +322,8 @@ class GLRenderer3D:
         glDisable(GL_BLEND)
         self.restore_3d()
 
-def start_gl_viz(engine):
-    renderer = GLRenderer3D(engine)
+def start_gl_viz(engine, width=1280, height=800):
+    renderer = GLRenderer3D(engine, width=width, height=height)
     renderer.init_gl()
     
     renderer.star_positions = renderer.build_stars()
